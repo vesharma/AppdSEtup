@@ -73,6 +73,24 @@
       register: machineagentoutput 
       changed_when: false
       ignore_errors: true
-      
-  
 
+    - name: Creating symlink of appdynamic machine agent service file
+      shell: cp -pv /opt/appdynamics/machine-agent/etc/init.d/appdynamics-machine-agent /etc/init.d/appdynamics-machine-agent
+      ignore_errors: true
+
+    - name: For replacing /opt/appdynamics/machine-agent/etc/init.d/controller-info.xml values
+      replace:
+        path: "/etc/init.d/appdynamics-machine-agent"
+        regexp: "{{ item.regexp }}"
+        replace: "{{ item.replace }}"
+      with_items:
+        - { regexp: "User=appdynamics-machine-agent",replace: "User=appdynamics-machine-agent" }
+        - { regexp: "Environment=MACHINE_AGENT_USER=appdynamics-machine-agent" , replace: "Environment=MACHINE_AGENT_USER=appdynamics-machine-agent" }
+
+    - name: reload daemon
+      shell: "{{ item }}"
+      with_items:
+       - "systemctl daemon-reload"
+       - "/etc/init.d/appdynamics-machine-agent start"
+       - "/etc/init.d/appdynamics-machine-agent status"
+      ignore_errors: yes
