@@ -1,0 +1,78 @@
+---
+  - hosts: localhost
+    become: true
+
+    #Plan:
+    # Download latest package
+    # Copy Setup from jumpserver to tmp location
+    # install zip through yum
+    # extract file in /opt/appdynamics
+    # replace Controller.xml
+
+
+    vars:
+     Setuplocation: "/root/AppDynamics-Setup"
+     machineagent: "appdynamics-machine-agent-21.9.0.3184.x86_64.rpm"
+     ctrlhost: "llppappdctl.onefiserv.net"
+     accountaccesskeyvar: "8843970b-03c5-41d6-b2f5-4438ce38bde2"
+     machineagentinstalldir: "/opt/appdynamics/machine-agent"
+     destvar: "/tmp/appdynamics"
+     Deploymentlocation: "/opt/appdynamics"
+     modevar: "775"
+
+    tasks:
+
+    - name: Test ping
+      ping: 
+
+    - name: 1. copy machineagent in location
+      copy: 
+        src:  "{{ Setuplocation }}/{{ item }}"
+        dest:  "{{ destvar }}"
+        mode: 775
+        remote_src: yes
+        force: yes
+        fail_on_missing: yes
+      register: outputcopy
+      failed_when: false
+      ignore_errors: true
+      with_items:
+        - "{{ machineagent }}"
+        
+    - debug:
+        msg: "{{ Setuplocation }}/{{ machineagent }}"
+
+    - name: installing machine agent rpm with yum
+      yum:
+         name: "{{ Setuplocation }}/{{ machineagent }}"
+         state: latest
+      register: yumoutput   
+      changed_when: yumoutput.rc != 0  
+
+    - name: For taking backup
+      copy:
+         src: "{{ item }}"
+         dest: "{{ item }}_{{ansible_date_time.date}}_{{ansible_date_time.time}}"
+         backup: true
+      with_items:
+         - "{{ machineagentinstalldir }}/conf/controller-info.xml"
+      ignore_errors: true
+
+
+    - name: For replacing /opt/appdynamics/machine-agent/conf/controller-info.xml values
+      replace:
+        path: "{{ machineagentinstalldir }}/conf/controller-info.xml"
+        regexp: "{{ item.regexp }}"
+        replace: "{{ item.replace }}"
+      with_items:   
+        - { regexp: "<controller-host></controller-host>",replace: "<controller-host> {{ ctrlhost }} </controller-host>" }
+        - { regexp: "<controller-port></controller-port>" , replace: "<controller-port>443</controller-port>" }
+        - { regexp: "<controller-ssl-enabled></controller-ssl-enabled>" , replace: "<controller-ssl-enabled>true</controller-ssl-enabled>" }
+        - { regexp: "<account-name></account-name>" , replace: "<account-name>customer1</account-name>" }
+        - { regexp: "<account-access-key></account-access-key>" , replace: "<account-access-key>{{ accountaccesskeyvar }} </account-access-key>" }
+      register: machineagentoutput 
+      changed_when: false
+      ignore_errors: true
+      
+  
+
